@@ -99,7 +99,7 @@ pub fn sidebar<'a>(selected: Option<SidebarMessage>, active: bool) -> Container<
         col = col.push(btn);
     }
 
-    col = col.push(Space::new(Length::Fill, Length::Fill));
+    col = col.push(Space::new().width(Length::Fill).height(Length::Fill));
 
     let power_button = button(svg(power_off::HANDLE.clone()).width(30).height(30))
         .padding(5)
@@ -130,9 +130,9 @@ pub fn sidebar<'a>(selected: Option<SidebarMessage>, active: bool) -> Container<
 
     col = col.push(
         row![
-            Space::new(Length::Fill, 20),
+            Space::new().width(Length::Fill).height(20),
             power_button,
-            Space::new(Length::Fill, 20)
+            Space::new().width(Length::Fill).height(20)
         ]
         .padding(10),
     );

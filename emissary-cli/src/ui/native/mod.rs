@@ -53,13 +53,14 @@ use iced::{
     border::Radius,
     time,
     widget::{canvas::Cache, container, row, svg, Column, Container, Row},
-    Alignment, Background, Border, Color, Element,
+    Alignment, Background, Border, Color, Element, Executor,
     Length::{self, FillPortion},
     Subscription, Task, Theme,
 };
 use tokio::sync::mpsc::Sender;
 
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     path::PathBuf,
     sync::Arc,
@@ -186,6 +187,38 @@ pub struct RouterUi {
     shutdown_tx: Sender<()>,
     base_path: PathBuf,
     address_book_handle: Option<Arc<AddressBookHandle>>,
+}
+
+/// A custom executor for iced. We'll need this primarily because iced calls
+/// `block_on` at some point, which ends up panicing because it's called in
+/// an async context [0].
+///
+/// [0]: https://docs.rs/tokio/1.32.0/tokio/runtime/struct.Runtime.html#panics
+struct TaskExecutor {}
+
+impl Executor for TaskExecutor {
+    fn new() -> Result<Self, futures::io::Error>
+    where
+        Self: Sized,
+    {
+        Ok(Self {})
+    }
+
+    fn spawn(
+        &self,
+        future: impl std::future::Future<Output = ()>
+            + iced::advanced::graphics::futures::MaybeSend
+            + 'static,
+    ) {
+        tokio::spawn(future);
+    }
+
+    // Annotation from iced:
+    // https://docs.rs/iced_futures/0.14.0/src/iced_futures/executor.rs.html#16
+    #[cfg(not(target_arch = "wasm32"))]
+    fn block_on<T>(&self, future: impl std::future::Future<Output = T>) -> T {
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
+    }
 }
 
 impl RouterUi {
@@ -351,19 +384,26 @@ impl RouterUi {
         router_id: RouterId,
         shutdown_tx: Sender<()>,
     ) -> anyhow::Result<()> {
-        iced::application("emissary", RouterUi::update, RouterUi::view)
+        // Upstream: https://github.com/iced-rs/iced/issues/3080
+        // Adapted from: https://discourse.iced.rs/t/solved-new-boot-trait-no-longer-able-to-use-a-capturing-closure-to-initialize-application-state/1012/6
+        let boot_once = RefCell::new(Some(RouterUi::new(
+            events,
+            config,
+            base_path,
+            address_book_handle,
+            router_id,
+            shutdown_tx,
+        )));
+        let boot = move || match boot_once.borrow_mut().take() {
+            Some(v) => v,
+            None => unreachable!(),
+        };
+        iced::application(boot, RouterUi::update, RouterUi::view)
+            .title("emissary")
             .subscription(RouterUi::subscription)
+            .executor::<TaskExecutor>()
             .theme(RouterUi::theme)
-            .run_with(move || {
-                RouterUi::new(
-                    events,
-                    config,
-                    base_path,
-                    address_book_handle,
-                    router_id,
-                    shutdown_tx,
-                )
-            })
+            .run()
             .map_err(From::from)
     }
 

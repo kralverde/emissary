@@ -428,11 +428,11 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A main function which should be run within an async context.
 #[cfg(feature = "native-ui")]
-fn main() -> anyhow::Result<()> {
-    let runtime = tokio::runtime::Runtime::new()?;
+async fn native_main() -> anyhow::Result<()> {
     let (shutdown_tx, shutdown_rx) = channel(1);
-    let arguments = runtime.block_on(parse_arguments());
+    let arguments = parse_arguments().await;
     let RouterContext {
         router,
         port_mapper,
@@ -442,20 +442,17 @@ fn main() -> anyhow::Result<()> {
         base_path,
         address_book_handle,
         router_id,
-    } = runtime.block_on(setup_router::<TokioRuntime>(arguments))?;
-
+    } = setup_router::<TokioRuntime>(arguments).await?;
     match router_ui_config {
         None => {
-            runtime.block_on(router_event_loop(router, port_mapper, shutdown_rx));
-
+            router_event_loop(router, port_mapper, shutdown_rx).await;
             Ok(())
         }
         Some(RouterUiConfig { .. }) => {
-            std::thread::spawn(move || {
-                runtime.block_on(router_event_loop(router, port_mapper, shutdown_rx));
+            tokio::spawn(async {
+                router_event_loop(router, port_mapper, shutdown_rx).await;
                 std::process::exit(0);
             });
-
             ui::native::RouterUi::start(
                 events,
                 config,
@@ -466,4 +463,10 @@ fn main() -> anyhow::Result<()> {
             )
         }
     }
+}
+
+#[cfg(feature = "native-ui")]
+fn main() -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Runtime::new()?;
+    runtime.block_on(native_main())
 }

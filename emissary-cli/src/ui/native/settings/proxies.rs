@@ -467,7 +467,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Enable", self.http_proxy.enabled())
+                    Checkbox::new(self.http_proxy.enabled())
+                        .label("Enable")
                         .size(15)
                         .on_toggle(Message::HttpEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -541,7 +542,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Enable", self.socks_proxy.enabled())
+                    Checkbox::new(self.socks_proxy.enabled())
+                        .label("Enable")
                         .size(15)
                         .on_toggle(Message::SocksEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {

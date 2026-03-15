@@ -32,7 +32,7 @@ use iced::{
     widget::{button, column, container, row, Column, Container, Row, Space},
     Border, Color, Element, Length, Theme,
 };
-use plotters_iced::ChartWidget;
+use plotters_iced2::ChartWidget;
 
 impl RouterUi {
     pub fn dashboard(&self) -> Element<'_, Message> {
@@ -110,7 +110,7 @@ impl RouterUi {
                         .push(
                             Text::new("HTTP Proxy").color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
                         )
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(http_proxy)
                         .width(Length::Fill),
                 )
@@ -119,28 +119,28 @@ impl RouterUi {
                         .push(
                             Text::new("SOCKS Proxy").color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
                         )
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(socks_proxy)
                         .width(Length::Fill),
                 )
                 .push(
                     Row::new()
                         .push(Text::new("I2CP").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(i2cp)
                         .width(Length::Fill),
                 )
                 .push(
                     Row::new()
                         .push(Text::new("SAMv3 TCP").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(sam_tcp)
                         .width(Length::Fill),
                 )
                 .push(
                     Row::new()
                         .push(Text::new("SAMv3 UDP").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(sam_udp)
                         .width(Length::Fill),
                 )
@@ -171,7 +171,7 @@ impl RouterUi {
                             Text::new("Router version")
                                 .color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
                         )
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(
                             Text::new(format!("v{}", env!("CARGO_PKG_VERSION")))
                                 .color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
@@ -181,7 +181,7 @@ impl RouterUi {
                 .push(
                     Row::new()
                         .push(Text::new("Router ID").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(
                             button(if self.show_router_id {
                                 Text::new(&self.router_id)
@@ -205,7 +205,7 @@ impl RouterUi {
                         .push(
                             Text::new("IPv4 status").color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
                         )
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(Text::new("OK").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
                         .width(Length::Fill),
                 )
@@ -214,14 +214,14 @@ impl RouterUi {
                         .push(
                             Text::new("IPv6 status").color(Color::from_rgb(0.8392, 0.8392, 0.8392)),
                         )
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push(Text::new("Disabled").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
                         .width(Length::Fill),
                 )
                 .push(
                     Row::new()
                         .push(Text::new("Uptime").color(Color::from_rgb(0.8392, 0.8392, 0.8392)))
-                        .push(Space::with_width(Length::Fill))
+                        .push(Space::new().width(Length::Fill))
                         .push({
                             let mut uptime = self.uptime.elapsed().as_secs();
                             if uptime == 0 {

@@ -31,7 +31,7 @@ use iced::{
     widget::{button, column, container, row, Column, Container, Row},
     Border, Color, Element, Length, Theme,
 };
-use plotters_iced::ChartWidget;
+use plotters_iced2::ChartWidget;
 
 fn time_button<'a>(
     label: &'a str,

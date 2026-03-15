@@ -73,7 +73,8 @@ impl RouterUi {
             Column::new()
                 .push(Text::new("NetDB"))
                 .push(
-                    Checkbox::new("Run the router as floodfill", self.advanced.floodfill())
+                    Checkbox::new(self.advanced.floodfill())
+                        .label("Run the router as floodfill")
                         .size(15)
                         .on_toggle(Message::FloodfillEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -101,7 +102,8 @@ impl RouterUi {
             Column::new()
                 .push(Text::new("Development"))
                 .push(
-                    Checkbox::new("Allow use of local addresses", self.advanced.allow_local())
+                    Checkbox::new(self.advanced.allow_local())
+                        .label("Allow use of local addresses")
                         .size(15)
                         .on_toggle(Message::LocalAddressesEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -122,7 +124,8 @@ impl RouterUi {
                         }),
                 )
                 .push(
-                    Checkbox::new("Enable insecure tunnels", self.advanced.insecure_tunnels())
+                    Checkbox::new(self.advanced.insecure_tunnels())
+                        .label("Enable insecure tunnels")
                         .size(15)
                         .on_toggle(Message::InsecureTunnelsEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {

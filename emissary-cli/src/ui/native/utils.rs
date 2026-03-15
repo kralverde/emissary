@@ -36,7 +36,7 @@ pub fn tab_button<T: Copy + PartialEq + Into<Tab>>(
     label: &'static str,
 ) -> Element<'static, Message> {
     let icon = svg(handle).width(20).height(20);
-    let content = row![icon, Space::with_width(8), Text::new(label)];
+    let content = row![icon, Space::new().width(8), Text::new(label)];
     let mut button = button(content).on_press(Message::TabSelected(tab.into()));
 
     if tab == active {
@@ -66,7 +66,7 @@ pub fn tab_button<T: Copy + PartialEq + Into<Tab>>(
     if tab == active {
         column![
             button,
-            Container::new(Space::new(Length::Fill, 1)).style(|_theme: &Theme| {
+            Container::new(Space::new().width(Length::Fill).height(1)).style(|_theme: &Theme| {
                 iced::widget::container::Style {
                     border: Border {
                         radius: Radius::from(12.0),
@@ -82,7 +82,7 @@ pub fn tab_button<T: Copy + PartialEq + Into<Tab>>(
     } else {
         column![
             button,
-            Container::new(Space::new(Length::Fill, 1)).style(|_theme: &Theme| {
+            Container::new(Space::new().width(Length::Fill).height(1)).style(|_theme: &Theme| {
                 iced::widget::container::Style {
                     border: Border {
                         radius: Radius::from(12.0),

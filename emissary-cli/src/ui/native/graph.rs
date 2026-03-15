@@ -26,13 +26,13 @@ use plotters::{
     prelude::*,
     style::{ShapeStyle, WHITE},
 };
-use plotters_iced::Chart;
+use plotters_iced2::Chart;
 
 impl Chart<Message> for RouterUi {
     type State = ();
 
     #[inline]
-    fn draw<R: plotters_iced::Renderer, F: Fn(&mut iced::widget::canvas::Frame)>(
+    fn draw<R: plotters_iced2::Renderer, F: Fn(&mut iced::widget::canvas::Frame)>(
         &self,
         renderer: &R,
         bounds: iced::Size,

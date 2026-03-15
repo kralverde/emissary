@@ -251,7 +251,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Publish", ntcp2_published)
+                    Checkbox::new(ntcp2_published)
+                        .label("Publish")
                         .size(15)
                         .on_toggle(Message::Ntcp2Published)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -272,7 +273,8 @@ impl RouterUi {
                         }),
                 )
                 .push(
-                    Checkbox::new("Enable", self.ntcp2.enabled())
+                    Checkbox::new(self.ntcp2.enabled())
+                        .label("Enable")
                         .size(15)
                         .on_toggle(Message::Ntcp2Enabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -350,7 +352,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Publish", ssu2_published)
+                    Checkbox::new(ssu2_published)
+                        .label("Publish")
                         .text_size(15)
                         .on_toggle(Message::Ssu2Published)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -371,7 +374,8 @@ impl RouterUi {
                         }),
                 )
                 .push(
-                    Checkbox::new("Enable", self.ssu2.enabled())
+                    Checkbox::new(self.ssu2.enabled())
+                        .label("Enable")
                         .text_size(15)
                         .on_toggle(Message::Ssu2Enabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -399,7 +403,8 @@ impl RouterUi {
             Column::new()
                 .push(Text::new("Port forwarding"))
                 .push(
-                    Checkbox::new("NAT-PMP", self.port_forwarding.nat_pmp)
+                    Checkbox::new(self.port_forwarding.nat_pmp)
+                        .label("NAT-PMP")
                         .text_size(15)
                         .on_toggle(Message::NatPmpEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -420,7 +425,8 @@ impl RouterUi {
                         }),
                 )
                 .push(
-                    Checkbox::new("UPnP", self.port_forwarding.upnp)
+                    Checkbox::new(self.port_forwarding.upnp)
+                        .label("UPnP")
                         .text_size(15)
                         .on_toggle(Message::UpnpEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {

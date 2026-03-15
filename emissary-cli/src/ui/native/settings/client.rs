@@ -230,7 +230,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Enable", self.i2cp.enabled())
+                    Checkbox::new(self.i2cp.enabled())
+                        .label("Enable")
                         .size(15)
                         .on_toggle(Message::I2cpEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {
@@ -327,7 +328,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Enable", self.sam.enabled())
+                    Checkbox::new(self.sam.enabled())
+                        .label("Enable")
                         .text_size(15)
                         .on_toggle(Message::SamEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {

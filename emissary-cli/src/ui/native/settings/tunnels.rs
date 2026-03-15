@@ -324,7 +324,8 @@ impl RouterUi {
                         ),
                 )
                 .push(
-                    Checkbox::new("Enable", self.transit.enabled())
+                    Checkbox::new(self.transit.enabled())
+                        .label("Enable")
                         .size(15)
                         .on_toggle(Message::TransitTunnelsEnabled)
                         .style(|_theme: &Theme, status: _| iced::widget::checkbox::Style {

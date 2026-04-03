@@ -276,7 +276,25 @@ impl LeaseSet2 {
 
                     match pubkey_type {
                         0x0004 => {
-                            let key = StaticPublicKey::from_bytes(pubkey)?;
+                            let key = StaticPublicKey::try_from_bytes(pubkey)?;
+                            public_keys.push(key);
+
+                            Some((rest, public_keys))
+                        }
+                        0x005 => {
+                            let key = StaticPublicKey::try_from_bytes_ml_kem_512(pubkey)?;
+                            public_keys.push(key);
+
+                            Some((rest, public_keys))
+                        }
+                        0x006 => {
+                            let key = StaticPublicKey::try_from_bytes_ml_kem_768(pubkey)?;
+                            public_keys.push(key);
+
+                            Some((rest, public_keys))
+                        }
+                        0x007 => {
+                            let key = StaticPublicKey::try_from_bytes_ml_kem_1024(pubkey)?;
                             public_keys.push(key);
 
                             Some((rest, public_keys))
@@ -384,7 +402,13 @@ impl LeaseSet2 {
         out.put_u8(self.public_keys.len() as u8);
 
         self.public_keys.into_iter().for_each(|key| {
-            out.put_u16(4); // x25519
+            match key {
+                StaticPublicKey::X25519(_) => out.put_u16(4),
+                StaticPublicKey::MlKem512X25519(_) => out.put_u16(5),
+                StaticPublicKey::MlKem768X25519(_) => out.put_u16(6),
+                StaticPublicKey::MlKem1024X25519(_) => out.put_u16(7),
+            }
+
             out.put_u16(32u16); // x25519 public key length
             out.put_slice(key.as_ref());
         });

@@ -51,7 +51,7 @@ use parking_lot::RwLock;
 #[cfg(feature = "no_std")]
 use spin::rwlock::RwLock;
 
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use alloc::{collections::VecDeque, sync::Arc, vec, vec::Vec};
 use core::{
     mem,
     pin::Pin,
@@ -231,11 +231,13 @@ impl<R: Runtime> SessionManager<R> {
     pub fn new(
         destination_id: DestinationId,
         private_key: StaticPrivateKey,
+        public_keys: Vec<StaticPublicKey>,
         lease_set: Bytes,
     ) -> Self {
         Self::with_ratchet_threshold(
             destination_id,
             private_key,
+            public_keys,
             lease_set,
             SESSION_DH_RATCHET_THRESHOLD,
         )
@@ -245,6 +247,7 @@ impl<R: Runtime> SessionManager<R> {
     pub fn with_ratchet_threshold(
         destination_id: DestinationId,
         private_key: StaticPrivateKey,
+        public_keys: Vec<StaticPublicKey>,
         lease_set: Bytes,
         ratchet_threshold: u16,
     ) -> Self {
@@ -252,7 +255,7 @@ impl<R: Runtime> SessionManager<R> {
             active: HashMap::new(),
             destination_id,
             garlic_tags: Default::default(),
-            key_context: KeyContext::from_private_key(private_key),
+            key_context: KeyContext::from_keys(private_key, public_keys),
             lease_set,
             lease_set_publish_timers: R::join_set(),
             protocol_response_timers: R::join_set(),
@@ -572,6 +575,7 @@ impl<R: Runtime> SessionManager<R> {
                             Ok(out.freeze().to_vec())
                         }
                         PendingSessionEvent::ReturnMessage { .. } => unreachable!(),
+                        PendingSessionEvent::DoNothing => unreachable!(),
                     }
                 }
                 // no pending nor active session for `destination_id`, create new outbound session
@@ -836,6 +840,7 @@ impl<R: Runtime> SessionManager<R> {
                         self.ratchet_threshold,
                     )? {
                         PendingSessionEvent::SendMessage { .. } => unreachable!(),
+                        PendingSessionEvent::DoNothing => return Ok(vec![].into_iter()),
                         PendingSessionEvent::CreateSession {
                             message,
                             context,
@@ -1151,18 +1156,58 @@ mod tests {
         };
     }
 
-    #[tokio::test]
-    async fn new_inbound_session() {
-        let private_key = StaticPrivateKey::random(MockRuntime::rng());
+    #[tokio::test(start_paused = true)]
+    async fn new_inbound_session_x25519() {
+        new_inbound_session(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_inbound_session_ml_kem_512() {
+        new_inbound_session(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_inbound_session_ml_kem_768() {
+        new_inbound_session(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_inbound_session_ml_kem_1024() {
+        new_inbound_session(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn new_inbound_session(
+        private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         let public_key = private_key.public();
         let destination_id = DestinationId::random();
         let (leaseset, signing_key) = LeaseSet2::random();
         let leaseset = Bytes::from(leaseset.serialize(&signing_key));
-        let mut session =
-            SessionManager::<MockRuntime>::new(destination_id.clone(), private_key, leaseset);
+        let mut session = SessionManager::<MockRuntime>::new(
+            destination_id.clone(),
+            private_key,
+            vec![public_key.clone()],
+            leaseset,
+        );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -1174,7 +1219,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(destination_id.clone(), public_key);
@@ -1239,18 +1285,58 @@ mod tests {
         assert!(outbound_session.active.contains_key(&destination_id));
     }
 
-    #[tokio::test]
-    async fn messages_out_of_order() {
-        let private_key = StaticPrivateKey::random(MockRuntime::rng());
+    #[tokio::test(start_paused = true)]
+    async fn messages_out_of_order_x25519() {
+        messages_out_of_order(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn messages_out_of_order_ml_kem_512() {
+        messages_out_of_order(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn messages_out_of_order_ml_kem_768() {
+        messages_out_of_order(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn messages_out_of_order_ml_kem_1024() {
+        messages_out_of_order(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn messages_out_of_order(
+        private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         let public_key = private_key.public();
         let destination_id = DestinationId::random();
         let (leaseset, signing_key) = LeaseSet2::random();
         let leaseset = Bytes::from(leaseset.serialize(&signing_key));
-        let mut session =
-            SessionManager::<MockRuntime>::new(destination_id.clone(), private_key, leaseset);
+        let mut session = SessionManager::<MockRuntime>::new(
+            destination_id.clone(),
+            private_key,
+            vec![public_key.clone()],
+            leaseset,
+        );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -1262,7 +1348,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(destination_id.clone(), public_key);
@@ -1370,10 +1457,47 @@ mod tests {
         assert_eq!(&message_body[4..], &vec![1, 3, 3, 7]);
     }
 
-    #[tokio::test]
-    async fn new_outbound_session() {
+    #[tokio::test(start_paused = true)]
+    async fn new_outbound_session_x25519() {
+        new_outbound_session(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_outbound_session_ml_kem_512() {
+        new_outbound_session(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_outbound_session_ml_kem_768() {
+        new_outbound_session(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_outbound_session_ml_kem_1024() {
+        new_outbound_session(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn new_outbound_session(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -1387,11 +1511,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -1403,7 +1527,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -1486,10 +1611,52 @@ mod tests {
         assert_eq!(&message_body[4..], &vec![1, 3, 3, 8]);
     }
 
-    #[tokio::test]
-    async fn two_simultaneous_inbound_sessions() {
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_inbound_sessions_x25519() {
+        two_simultaneous_inbound_sessions(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_inbound_sessions_ml_kem_512() {
+        two_simultaneous_inbound_sessions(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_inbound_sessions_ml_kem_768() {
+        two_simultaneous_inbound_sessions(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_inbound_sessions_ml_kem_1024() {
+        two_simultaneous_inbound_sessions(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn two_simultaneous_inbound_sessions(
+        inbound_private_key: StaticPrivateKey,
+        outbound1_private_key: StaticPrivateKey,
+        outbound2_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -1503,11 +1670,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create first outbound `SessionManager`
-        let outbound1_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound1_leaseset, outbound1_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound1_destination_id = leaseset.header.destination.id();
@@ -1519,14 +1686,14 @@ mod tests {
         };
         let mut outbound1_session = SessionManager::<MockRuntime>::new(
             outbound1_destination_id.clone(),
-            outbound1_private_key,
+            outbound1_private_key.clone(),
+            vec![outbound1_private_key.public()],
             outbound1_leaseset,
         );
         outbound1_session
             .add_remote_destination(inbound_destination_id.clone(), inbound_public_key.clone());
 
         // create second outbound `SessionManager`
-        let outbound2_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound2_leaseset, outbound2_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound2_destination_id = leaseset.header.destination.id();
@@ -1538,7 +1705,8 @@ mod tests {
         };
         let mut outbound2_session = SessionManager::<MockRuntime>::new(
             outbound2_destination_id.clone(),
-            outbound2_private_key,
+            outbound2_private_key.clone(),
+            vec![outbound2_private_key.public()],
             outbound2_leaseset,
         );
         outbound2_session
@@ -1717,10 +1885,52 @@ mod tests {
         assert_eq!(outbound2_session.pending.len(), 0);
     }
 
-    #[tokio::test]
-    async fn two_simultaneous_outbound_sessions() {
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_outbound_sessions_x25519() {
+        two_simultaneous_outbound_sessions(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_outbound_sessions_ml_kem_512() {
+        two_simultaneous_outbound_sessions(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_outbound_sessions_ml_kem_768() {
+        two_simultaneous_outbound_sessions(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn two_simultaneous_outbound_sessions_ml_kem_1024() {
+        two_simultaneous_outbound_sessions(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn two_simultaneous_outbound_sessions(
+        inbound1_private_key: StaticPrivateKey,
+        inbound2_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create first inbound `SessionManager`
-        let inbound1_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound1_public_key = inbound1_private_key.public();
         let (inbound1_leaseset, inbound1_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -1733,12 +1943,12 @@ mod tests {
         };
         let mut inbound1_session = SessionManager::<MockRuntime>::new(
             inbound1_destination_id.clone(),
-            inbound1_private_key,
+            inbound1_private_key.clone(),
+            vec![inbound1_private_key.public()],
             inbound1_leaseset,
         );
 
         // create second inbound `SessionManager`
-        let inbound2_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound2_public_key = inbound2_private_key.public();
         let (inbound2_leaseset, inbound2_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -1751,12 +1961,12 @@ mod tests {
         };
         let mut inbound2_session = SessionManager::<MockRuntime>::new(
             inbound2_destination_id.clone(),
-            inbound2_private_key,
+            inbound2_private_key.clone(),
+            vec![inbound2_private_key.public()],
             inbound2_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -1768,7 +1978,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session
@@ -1916,10 +2127,47 @@ mod tests {
         assert_eq!(outbound_session.pending.len(), 0);
     }
 
-    #[tokio::test]
-    async fn tags_are_autogenerated() {
+    #[tokio::test(start_paused = true)]
+    async fn tags_are_autogenerated_x25519() {
+        tags_are_autogenerated(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tags_are_autogenerated_ml_kem_512() {
+        tags_are_autogenerated(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tags_are_autogenerated_ml_kem_768() {
+        tags_are_autogenerated(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tags_are_autogenerated_ml_kem_1024() {
+        tags_are_autogenerated(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn tags_are_autogenerated(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -1933,11 +2181,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -1949,7 +2197,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2038,10 +2287,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn dh_ratchet() {
+    #[tokio::test(start_paused = true)]
+    async fn dh_ratchet_x25519() {
+        dh_ratchet(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dh_ratchet_ml_kem_512() {
+        dh_ratchet(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dh_ratchet_ml_kem_768() {
+        dh_ratchet(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dh_ratchet_ml_kem_1024() {
+        dh_ratchet(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn dh_ratchet(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2055,12 +2341,12 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
             TEST_THRESHOLD,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_leaseset, outbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
             let outbound_destination_id = leaseset.header.destination.id();
@@ -2072,7 +2358,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             outbound_destination_id.clone(),
-            outbound_private_key,
+            outbound_private_key.clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
             TEST_THRESHOLD,
         );
@@ -2181,10 +2468,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn local_lease_set_bundled_with_data() {
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_bundled_with_data_x25519() {
+        local_lease_set_bundled_with_data(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_bundled_with_data_ml_kem_512() {
+        local_lease_set_bundled_with_data(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_bundled_with_data_ml_kem_768() {
+        local_lease_set_bundled_with_data(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_bundled_with_data_ml_kem_1024() {
+        local_lease_set_bundled_with_data(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn local_lease_set_bundled_with_data(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2198,11 +2522,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2222,7 +2546,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2413,9 +2738,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn local_lease_set_publish_timer_expires() {
+    async fn local_lease_set_publish_timer_expires_x25519() {
+        local_lease_set_publish_timer_expires(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_publish_timer_expires_ml_kem_512() {
+        local_lease_set_publish_timer_expires(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_publish_timer_expires_ml_kem_768() {
+        local_lease_set_publish_timer_expires(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_lease_set_publish_timer_expires_ml_kem_1024() {
+        local_lease_set_publish_timer_expires(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn local_lease_set_publish_timer_expires(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2429,11 +2791,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2453,7 +2815,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2653,10 +3016,47 @@ mod tests {
             .is_none());
     }
 
-    #[tokio::test]
-    async fn multiple_new_session_messages() {
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_messages_x25519() {
+        multiple_new_session_messages(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_messages_ml_kem_512() {
+        multiple_new_session_messages(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_messages_ml_kem_768() {
+        multiple_new_session_messages(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_messages_ml_kem_1024() {
+        multiple_new_session_messages(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn multiple_new_session_messages(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2670,11 +3070,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2694,7 +3094,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2732,10 +3133,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn multiple_new_session_reply_messages() {
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_reply_messages_x25519() {
+        multiple_new_session_reply_messages(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_reply_messages_ml_kem_512() {
+        multiple_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_reply_messages_ml_kem_768() {
+        multiple_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_reply_messages_ml_kem_1024() {
+        multiple_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    async fn multiple_new_session_reply_messages(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2749,11 +3187,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2773,7 +3211,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2809,10 +3248,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn multiple_new_session_and_new_session_reply_messages() {
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_and_new_session_reply_messages_x25519() {
+        multiple_new_session_and_new_session_reply_messages(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_and_new_session_reply_messages_ml_kem_512() {
+        multiple_new_session_and_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_and_new_session_reply_messages_ml_kem_768() {
+        multiple_new_session_and_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn multiple_new_session_and_new_session_reply_messages_ml_kem_1024() {
+        multiple_new_session_and_new_session_reply_messages(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn multiple_new_session_and_new_session_reply_messages(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2826,11 +3302,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2850,7 +3326,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2893,10 +3370,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn new_session_retried() {
+    #[tokio::test(start_paused = true)]
+    async fn new_session_retried_x25519() {
+        new_session_retried(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_retried_ml_kem_512() {
+        new_session_retried(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_retried_ml_kem_768() {
+        new_session_retried(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_retried_ml_kem_1024() {
+        new_session_retried(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn new_session_retried(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2910,11 +3424,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -2934,7 +3448,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -2963,10 +3478,47 @@ mod tests {
         decrypt_and_verify!(&mut outbound_session, message, vec![5u8; 4]);
     }
 
-    #[tokio::test]
-    async fn new_session_reply_retried() {
+    #[tokio::test(start_paused = true)]
+    async fn new_session_reply_retried_x25519() {
+        new_session_reply_retried(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_reply_retried_ml_kem_512() {
+        new_session_reply_retried(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_reply_retried_ml_kem_768() {
+        new_session_reply_retried(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn new_session_reply_retried_ml_kem_1024() {
+        new_session_reply_retried(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn new_session_reply_retried(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -2980,11 +3532,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3004,7 +3556,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -3035,10 +3588,47 @@ mod tests {
         decrypt_and_verify!(&mut outbound_session, message, vec![5u8; 4]);
     }
 
-    #[tokio::test]
-    async fn lease_set_bundled_in_ns_retries() {
+    #[tokio::test(start_paused = true)]
+    async fn lease_set_bundled_in_ns_retries_x25519() {
+        lease_set_bundled_in_ns_retries(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lease_set_bundled_in_ns_retries_ml_kem_512() {
+        lease_set_bundled_in_ns_retries(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lease_set_bundled_in_ns_retries_ml_kem_768() {
+        lease_set_bundled_in_ns_retries(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lease_set_bundled_in_ns_retries_ml_kem_1024() {
+        lease_set_bundled_in_ns_retries(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn lease_set_bundled_in_ns_retries(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3052,11 +3642,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3076,7 +3666,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -3105,9 +3696,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn explicit_ack_response() {
+    async fn explicit_ack_response_x25519() {
+        explicit_ack_response(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_ml_kem_512() {
+        explicit_ack_response(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_ml_kem_768() {
+        explicit_ack_response(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_ml_kem_1024() {
+        explicit_ack_response(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn explicit_ack_response(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3121,11 +3749,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3145,7 +3773,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -3262,9 +3891,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn explicit_ack_response_canceled() {
+    async fn explicit_ack_response_canceled_x25519() {
+        explicit_ack_response_canceled(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_canceled_ml_kem_512() {
+        explicit_ack_response_canceled(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_canceled_ml_kem_768() {
+        explicit_ack_response_canceled(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_response_canceled_ml_kem_1024() {
+        explicit_ack_response_canceled(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn explicit_ack_response_canceled(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3278,11 +3944,11 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::new(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3302,7 +3968,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::new(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
         );
         outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
@@ -3398,9 +4065,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn explicit_next_key_response() {
+    async fn explicit_next_key_response_x25519() {
+        explicit_next_key_response(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_ml_kem_512() {
+        explicit_next_key_response(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_ml_kem_768() {
+        explicit_next_key_response(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_ml_kem_1024() {
+        explicit_next_key_response(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn explicit_next_key_response(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3414,12 +4118,12 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
             TEST_THRESHOLD,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3439,7 +4143,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
             TEST_THRESHOLD,
         );
@@ -3527,9 +4232,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn explicit_next_key_response_canceled() {
+    async fn explicit_next_key_response_canceled_x25519() {
+        explicit_next_key_response_canceled(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_canceled_ml_kem_512() {
+        explicit_next_key_response_canceled(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_canceled_ml_kem_768() {
+        explicit_next_key_response_canceled(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_next_key_response_canceled_ml_kem_1024() {
+        explicit_next_key_response_canceled(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn explicit_next_key_response_canceled(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3543,12 +4285,12 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
             TEST_THRESHOLD,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3568,7 +4310,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
             TEST_THRESHOLD,
         );
@@ -3635,9 +4378,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn explicit_ack_and_next_key_response() {
+    async fn explicit_ack_and_next_key_response_x25519() {
+        explicit_ack_and_next_key_response(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_and_next_key_response_ml_kem_512() {
+        explicit_ack_and_next_key_response(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_and_next_key_response_ml_kem_768() {
+        explicit_ack_and_next_key_response(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn explicit_ack_and_next_key_response_ml_kem_1024() {
+        explicit_ack_and_next_key_response(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await
+    }
+
+    async fn explicit_ack_and_next_key_response(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
         // create inbound `SessionManager`
-        let inbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let inbound_public_key = inbound_private_key.public();
         let (inbound_leaseset, inbound_destination_id) = {
             let (leaseset, signing_key) = LeaseSet2::random();
@@ -3651,12 +4431,12 @@ mod tests {
         let mut inbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             inbound_destination_id.clone(),
             inbound_private_key,
+            vec![inbound_public_key.clone()],
             inbound_leaseset,
             TEST_THRESHOLD,
         );
 
         // create outbound `SessionManager`
-        let outbound_private_key = StaticPrivateKey::random(MockRuntime::rng());
         let (
             outbound_leaseset,
             outbound_destination_id,
@@ -3676,7 +4456,8 @@ mod tests {
         };
         let mut outbound_session = SessionManager::<MockRuntime>::with_ratchet_threshold(
             outbound_destination_id.clone(),
-            outbound_private_key.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
             outbound_leaseset,
             TEST_THRESHOLD,
         );
@@ -3874,9 +4655,10 @@ mod tests {
         let (private_key, public_key, representative) = {
             let (private_key, tweak) = KeyContext::<MockRuntime>::generate_ephemeral_keypair();
             // conversion is expected to succeed since the key was generated by us
-            let sk = StaticPrivateKey::from_bytes(&private_key).expect("to succeed");
-            let public_key =
-                StaticPublicKey::from(Randomized::mul_base_clamped(private_key).to_montgomery().0);
+            let sk = StaticPrivateKey::try_from_bytes(&private_key).expect("to succeed");
+            let public_key = StaticPublicKey::from_bytes(
+                Randomized::mul_base_clamped(private_key).to_montgomery().0,
+            );
 
             // elligator2 conversion must succeed because `Self::generate_ephemeral_keypair()`
             // has ensured that the public key is encodable
@@ -3983,8 +4765,12 @@ mod tests {
         let destination_id = DestinationId::random();
         let (leaseset, signing_key) = LeaseSet2::random();
         let leaseset = Bytes::from(leaseset.serialize(&signing_key));
-        let mut session =
-            SessionManager::<MockRuntime>::new(destination_id.clone(), private_key, leaseset);
+        let mut session = SessionManager::<MockRuntime>::new(
+            destination_id.clone(),
+            private_key.clone(),
+            vec![private_key.public()],
+            leaseset,
+        );
 
         let message = Message {
             message_type: MessageType::Garlic,
@@ -4007,8 +4793,12 @@ mod tests {
         let destination_id = DestinationId::random();
         let (leaseset, signing_key) = LeaseSet2::random();
         let leaseset = Bytes::from(leaseset.serialize(&signing_key));
-        let mut session =
-            SessionManager::<MockRuntime>::new(destination_id.clone(), private_key, leaseset);
+        let mut session = SessionManager::<MockRuntime>::new(
+            destination_id.clone(),
+            private_key.clone(),
+            vec![private_key.public()],
+            leaseset,
+        );
 
         let message = Message {
             message_type: MessageType::Garlic,
@@ -4035,8 +4825,12 @@ mod tests {
         let destination_id = DestinationId::random();
         let (leaseset, signing_key) = LeaseSet2::random();
         let leaseset = Bytes::from(leaseset.serialize(&signing_key));
-        let mut session =
-            SessionManager::<MockRuntime>::new(destination_id.clone(), private_key, leaseset);
+        let mut session = SessionManager::<MockRuntime>::new(
+            destination_id.clone(),
+            private_key.clone(),
+            vec![private_key.public()],
+            leaseset,
+        );
 
         let message = Message {
             message_type: MessageType::Garlic,
@@ -4056,6 +4850,147 @@ mod tests {
             Err(SessionError::Timestamp) => {}
             Err(error) => panic!("unexpected error: {error:?}"),
             Ok(_) => panic!("unexpected success"),
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn malformed_new_session_reply_x25519() {
+        malformed_new_session_reply(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            StaticPrivateKey::random(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn malformed_new_session_reply_ml_kem_512() {
+        malformed_new_session_reply(
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_512(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn malformed_new_session_reply_ml_kem_768() {
+        malformed_new_session_reply(
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_768(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn malformed_new_session_reply_ml_kem_1024() {
+        malformed_new_session_reply(
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+            StaticPrivateKey::random_ml_kem_1024(MockRuntime::rng()),
+        )
+        .await;
+    }
+
+    // first NSR is decrypted successfully but the second NSR is malformed
+    //
+    // verify the NSR is discarded and the session can still finish the handshake
+    async fn malformed_new_session_reply(
+        inbound_private_key: StaticPrivateKey,
+        outbound_private_key: StaticPrivateKey,
+    ) {
+        // create inbound `SessionManager`
+        let inbound_public_key = inbound_private_key.public();
+        let (inbound_leaseset, inbound_destination_id) = {
+            let (leaseset, signing_key) = LeaseSet2::random();
+            let inbound_destination_id = leaseset.header.destination.id();
+
+            (
+                Bytes::from(leaseset.serialize(&signing_key)),
+                inbound_destination_id,
+            )
+        };
+        let mut inbound_session = SessionManager::<MockRuntime>::new(
+            inbound_destination_id.clone(),
+            inbound_private_key,
+            vec![inbound_public_key.clone()],
+            inbound_leaseset,
+        );
+
+        // create outbound `SessionManager`
+        let (
+            outbound_leaseset,
+            outbound_destination_id,
+            _outbound_destination,
+            _outbound_signing_key,
+        ) = {
+            let (leaseset, signing_key) = LeaseSet2::random();
+            let destination = leaseset.header.destination.clone();
+            let outbound_destination_id = leaseset.header.destination.id();
+
+            (
+                Bytes::from(leaseset.serialize(&signing_key)),
+                outbound_destination_id,
+                destination,
+                signing_key,
+            )
+        };
+        let mut outbound_session = SessionManager::<MockRuntime>::new(
+            outbound_destination_id.clone(),
+            outbound_private_key.clone().clone(),
+            vec![outbound_private_key.public()],
+            outbound_leaseset,
+        );
+        outbound_session.add_remote_destination(inbound_destination_id.clone(), inbound_public_key);
+
+        // initialize outbound session and create three NS messages
+        let message = outbound_session.encrypt(&inbound_destination_id, vec![1, 1, 1, 1]).unwrap();
+        decrypt_and_verify!(&mut inbound_session, message, vec![1u8; 4]);
+
+        // create multiple NSR messages
+        let mut messages = [
+            inbound_session.encrypt(&outbound_destination_id, vec![2, 2, 2, 2]).unwrap(),
+            inbound_session.encrypt(&outbound_destination_id, vec![3, 3, 3, 3]).unwrap(),
+            inbound_session.encrypt(&outbound_destination_id, vec![4, 4, 4, 4]).unwrap(),
+        ];
+
+        // for the second NSR, write garbage to section after the elligator2-encoded public key
+        //
+        // for x25519, this is the static key section and for ml-kem-* it's the kem ciphertext
+        {
+            let message = &mut messages[1];
+            for i in 50..=65 {
+                message[i] ^= 0xff;
+            }
+        }
+
+        // first message decrypts successfully
+        decrypt_and_verify!(&mut outbound_session, messages[0].clone(), vec![2u8; 4]);
+
+        // second message is
+        assert_eq!(
+            outbound_session
+                .decrypt(Message {
+                    payload: messages[1].clone(),
+                    ..Default::default()
+                })
+                .unwrap()
+                .count(),
+            0
+        );
+
+        // third message decrypts successfully
+        decrypt_and_verify!(&mut outbound_session, messages[2].clone(), vec![4u8; 4]);
+
+        // exchange few messages between the session to confirm they both work
+        for i in 5..=8 {
+            // send message from outbound to inbound
+            let message =
+                outbound_session.encrypt(&inbound_destination_id, vec![i as u8; 4]).unwrap();
+            decrypt_and_verify!(&mut inbound_session, message, vec![i as u8; 4]);
+
+            // send message from inbound to outbound
+            let message = inbound_session
+                .encrypt(&outbound_destination_id, vec![(i + 1) as u8; 4])
+                .unwrap();
+            decrypt_and_verify!(&mut outbound_session, message, vec![(i + 1) as u8; 4]);
         }
     }
 }

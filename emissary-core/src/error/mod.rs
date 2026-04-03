@@ -381,6 +381,18 @@ pub enum SessionError {
 
     /// New session message has an invalid timestamp
     Timestamp,
+
+    /// Message is too short for ML-KEM.
+    TooShortForMlKem,
+
+    /// Encapsulation failed.
+    EncapsulationFailure,
+
+    /// Decapsulation failed.
+    DecapsulationFailure,
+
+    /// ML-KEM not enabled.
+    MlKemNotEnabled,
 }
 
 impl fmt::Display for SessionError {
@@ -393,6 +405,10 @@ impl fmt::Display for SessionError {
             Self::InvalidState => write!(f, "invalid state"),
             Self::InvalidKey => write!(f, "invalid key"),
             Self::Timestamp => write!(f, "excess message timestamp skew"),
+            Self::TooShortForMlKem => write!(f, "message too short to be ml-kem"),
+            Self::EncapsulationFailure => write!(f, "encapsulation failed"),
+            Self::DecapsulationFailure => write!(f, "decapsulation failed"),
+            Self::MlKemNotEnabled => write!(f, "ml-kem not enabled"),
         }
     }
 }

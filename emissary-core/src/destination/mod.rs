@@ -808,8 +808,9 @@ impl<R: Runtime> Stream for Destination<R> {
                             ?error,
                             "failed to handle inbound message",
                         ),
-                        Ok(messages) if !messages.is_empty() =>
-                            return Poll::Ready(Some(DestinationEvent::Messages { messages })),
+                        Ok(messages) if !messages.is_empty() => {
+                            return Poll::Ready(Some(DestinationEvent::Messages { messages }))
+                        }
                         Ok(_) => {}
                     }
                 }
@@ -821,10 +822,11 @@ impl<R: Runtime> Stream for Destination<R> {
             match self.session_manager.poll_next_unpin(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(None),
-                Poll::Ready(Some(SessionManagerEvent::SessionTerminated { destination_id })) =>
+                Poll::Ready(Some(SessionManagerEvent::SessionTerminated { destination_id })) => {
                     return Poll::Ready(Some(DestinationEvent::SessionTerminated {
                         destination_id,
-                    })),
+                    }))
+                }
                 Poll::Ready(Some(SessionManagerEvent::SendMessage {
                     destination_id,
                     message,
@@ -997,7 +999,7 @@ impl<R: Runtime> Stream for Destination<R> {
 mod tests {
     use super::*;
     use crate::{
-        crypto::SigningPrivateKey,
+        crypto::SigningKey,
         i2np::garlic::GarlicClove,
         netdb::NetDbAction,
         primitives::{Destination as Dest, LeaseSet2Header, MessageId, RouterId, TunnelId},
@@ -1404,7 +1406,7 @@ mod tests {
         );
 
         // create remote destination and two leases for it
-        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let signing_key = SigningKey::random(MockRuntime::rng());
         let encryption_key = StaticPrivateKey::random(MockRuntime::rng());
         let dest = Dest::new::<MockRuntime>(signing_key.public());
         let remote_dest_id = dest.id();

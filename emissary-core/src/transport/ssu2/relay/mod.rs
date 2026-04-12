@@ -17,7 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{chachapoly::ChaChaPoly, SigningPublicKey, StaticPublicKey},
+    crypto::{chachapoly::ChaChaPoly, StaticPublicKey, VerifyingKey},
     error::{RelayError, Ssu2Error},
     primitives::{MlKemPreference, RouterAddress, RouterId, RouterInfo},
     router::context::RouterContext,
@@ -132,7 +132,7 @@ pub struct RelayConnection {
     pub static_key: StaticPublicKey,
 
     /// Verifying key of Charlie.
-    pub verifying_key: SigningPublicKey,
+    pub verifying_key: VerifyingKey,
 
     /// Protocol version.
     pub version: ProtocolVersion,
@@ -168,7 +168,7 @@ struct RelayProcess<R: Runtime> {
     charlie_router_id: RouterId,
 
     /// Verifying key of Charlie.
-    charlie_verifying_key: SigningPublicKey,
+    charlie_verifying_key: VerifyingKey,
 
     /// When was the relay request sent.
     created: R::Instant,
@@ -380,7 +380,7 @@ impl<R: Runtime> RelayManager<R> {
         disable_pq: bool,
     ) -> Result<RelayConnection, RelayError> {
         let charlie_router_id = router_info.identity.id();
-        let charlie_verifying_key = router_info.identity.signing_key();
+        let charlie_verifying_key = router_info.identity.verifying_key();
 
         let (introducers, intro_key, static_key, mtu, ml_kem) = match router_info
             .addresses()
@@ -418,10 +418,12 @@ impl<R: Runtime> RelayManager<R> {
         // select version for the relay connection
         let version = match ml_kem {
             None => ProtocolVersion::V2,
-            Some(MlKemPreference::MlKem512 | MlKemPreference::MlKem512MlKem768) =>
-                ProtocolVersion::V3,
-            Some(MlKemPreference::MlKem768 | MlKemPreference::MlKem768MlKem512) =>
-                ProtocolVersion::V4,
+            Some(MlKemPreference::MlKem512 | MlKemPreference::MlKem512MlKem768) => {
+                ProtocolVersion::V3
+            }
+            Some(MlKemPreference::MlKem768 | MlKemPreference::MlKem768MlKem512) => {
+                ProtocolVersion::V4
+            }
         };
 
         // create relay request and signature
@@ -760,7 +762,7 @@ impl<R: Runtime> RelayManager<R> {
             payload.put_slice(&charlie_router_id.to_vec());
             payload.put_slice(&message);
 
-            if router_info.identity.signing_key().verify(&payload, &signature).is_err() {
+            if router_info.identity.verifying_key().verify(&payload, &signature).is_err() {
                 tracing::warn!(
                     %alice_router_id,
                     ?nonce,
@@ -910,7 +912,7 @@ impl<R: Runtime> RelayManager<R> {
             payload.put_slice(&self.router_ctx.router_id().to_vec());
             payload.put_slice(&message);
 
-            if router_info.identity.signing_key().verify(&payload, &signature).is_err() {
+            if router_info.identity.verifying_key().verify(&payload, &signature).is_err() {
                 tracing::warn!(
                     target: LOG_TARGET,
                     ?relay_tag,
@@ -1322,7 +1324,7 @@ impl<R: Runtime> Stream for RelayManager<R> {
 mod tests {
     use super::*;
     use crate::{
-        crypto::{base64_encode, chachapoly::ChaChaPoly, SigningPrivateKey, StaticPrivateKey},
+        crypto::{base64_encode, chachapoly::ChaChaPoly, SigningKey, StaticPrivateKey},
         primitives::{RouterInfoBuilder, Str},
         profile::ProfileStorage,
         router::context::builder::RouterContextBuilder,
@@ -1342,7 +1344,7 @@ mod tests {
         router_id: RouterId,
         router_info: RouterInfo,
         static_key: StaticPrivateKey,
-        signing_key: SigningPrivateKey,
+        signing_key: SigningKey,
         serialized: Vec<u8>,
         socket: MockUdpSocket,
         intro_key: [u8; 32],
@@ -2911,8 +2913,9 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3006,8 +3009,9 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3102,8 +3106,9 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3277,8 +3282,9 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3450,8 +3456,9 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3624,8 +3631,9 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3800,8 +3808,9 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => {}
         }
     }
@@ -3923,7 +3932,7 @@ mod tests {
         let nonce = 1338;
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -3996,7 +4005,7 @@ mod tests {
         let nonce = 1338;
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4033,8 +4042,9 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie_router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie_router_id)
+            }
             _ => panic!("unexpected event"),
         }
     }
@@ -4063,7 +4073,7 @@ mod tests {
         let nonce = 1338;
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4100,8 +4110,9 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie_router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie_router_id)
+            }
             _ => panic!("unexpected event"),
         }
     }
@@ -4129,7 +4140,7 @@ mod tests {
         let relay_tag = 1337;
         let nonce = 1338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4166,8 +4177,9 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie_router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie_router_id)
+            }
             _ => panic!("unexpected event"),
         }
     }
@@ -4196,7 +4208,7 @@ mod tests {
         let nonce = 1338;
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4221,8 +4233,9 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie_router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie_router_id)
+            }
             _ => panic!("unexpected event"),
         }
     }
@@ -4252,7 +4265,7 @@ mod tests {
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
         let dst_id = (((nonce as u64) << 32) | (nonce as u64)).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4334,7 +4347,7 @@ mod tests {
         let relay_tag = 1337;
         let nonce = 1338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4378,7 +4391,7 @@ mod tests {
         let token = 13371338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
         let dst_id = (((nonce as u64) << 32) | (nonce as u64)).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4455,7 +4468,7 @@ mod tests {
         let relay_tag = 1337;
         let nonce = 1338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4498,7 +4511,7 @@ mod tests {
         let nonce = 1338;
         let src_id = (!(((nonce as u64) << 32) | (nonce as u64))).to_be();
         let dst_id = (((nonce as u64) << 32) | (nonce as u64)).to_be();
-        let charlie_signing_key = SigningPrivateKey::random(&mut MockRuntime::rng());
+        let charlie_signing_key = SigningKey::random(&mut MockRuntime::rng());
 
         alice_relay.active_outbound.insert(
             src_id,
@@ -4561,8 +4574,9 @@ mod tests {
             alice_relay.send_relay_request(charlie.parsed(), false).unwrap();
 
         match timeout!(alice_relay.next(), Duration::from_secs(30)).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } =>
-                assert_eq!(router_id, charlie.router_id),
+            RelayManagerEvent::RelayFailure { router_id } => {
+                assert_eq!(router_id, charlie.router_id)
+            }
             _ => panic!("unexpected event"),
         }
     }

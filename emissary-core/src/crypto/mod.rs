@@ -273,12 +273,15 @@ impl StaticPrivateKey {
     pub fn public(&self) -> StaticPublicKey {
         match self {
             Self::X25519(key) => StaticPublicKey::X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem512X25519(key) =>
-                StaticPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem768X25519(key) =>
-                StaticPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem1024X25519(key) =>
-                StaticPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key)),
+            Self::MlKem512X25519(key) => {
+                StaticPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem768X25519(key) => {
+                StaticPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem1024X25519(key) => {
+                StaticPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key))
+            }
         }
     }
 
@@ -286,12 +289,15 @@ impl StaticPrivateKey {
     pub fn diffie_hellman<T: AsRef<x25519_dalek::PublicKey>>(&self, public_key: &T) -> Vec<u8> {
         match self {
             Self::X25519(key) => key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem512X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem768X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem1024X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
+            Self::MlKem512X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem768X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem1024X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
         }
     }
 
@@ -402,12 +408,15 @@ impl EphemeralPrivateKey {
     pub fn public(&self) -> EphemeralPublicKey {
         match self {
             Self::X25519(key) => EphemeralPublicKey::X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem512X25519(key) =>
-                EphemeralPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem768X25519(key) =>
-                EphemeralPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem1024X25519(key) =>
-                EphemeralPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key)),
+            Self::MlKem512X25519(key) => {
+                EphemeralPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem768X25519(key) => {
+                EphemeralPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem1024X25519(key) => {
+                EphemeralPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key))
+            }
         }
     }
 
@@ -415,12 +424,15 @@ impl EphemeralPrivateKey {
     pub fn diffie_hellman<T: AsRef<x25519_dalek::PublicKey>>(&self, public_key: &T) -> Vec<u8> {
         match self {
             Self::X25519(key) => key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem512X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem768X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem1024X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
+            Self::MlKem512X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem768X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem1024X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
         }
     }
 }
@@ -524,12 +536,12 @@ impl Zeroize for EphemeralPublicKey {
 
 /// Signing private key.
 #[derive(Clone)]
-pub enum SigningPrivateKey {
+pub enum SigningKey {
     /// EdDSA.
     Ed25519(ed25519_dalek::SigningKey),
 }
 
-impl SigningPrivateKey {
+impl SigningKey {
     /// Generate random [`SigningPrivateKey`].
     pub fn random(mut csprng: impl CryptoRng) -> Self {
         Self::Ed25519(ed25519_dalek::SigningKey::generate(&mut csprng))
@@ -540,7 +552,7 @@ impl SigningPrivateKey {
         let key: [u8; 32] = key.to_vec().try_into().ok()?;
         let key = ed25519_dalek::SigningKey::from_bytes(&key);
 
-        Some(SigningPrivateKey::Ed25519(key))
+        Some(SigningKey::Ed25519(key))
     }
 
     /// Sign `message`.
@@ -551,9 +563,9 @@ impl SigningPrivateKey {
     }
 
     /// Get verifying key.
-    pub fn public(&self) -> SigningPublicKey {
+    pub fn public(&self) -> VerifyingKey {
         match self {
-            Self::Ed25519(key) => SigningPublicKey::Ed25519(key.verifying_key()),
+            Self::Ed25519(key) => VerifyingKey::Ed25519(key.verifying_key()),
         }
     }
 
@@ -565,13 +577,13 @@ impl SigningPrivateKey {
     }
 }
 
-impl From<[u8; 32]> for SigningPrivateKey {
+impl From<[u8; 32]> for SigningKey {
     fn from(value: [u8; 32]) -> Self {
-        SigningPrivateKey::Ed25519(ed25519_dalek::SigningKey::from(value))
+        SigningKey::Ed25519(ed25519_dalek::SigningKey::from(value))
     }
 }
 
-impl AsRef<[u8]> for SigningPrivateKey {
+impl AsRef<[u8]> for SigningKey {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Ed25519(key) => key.as_bytes(),
@@ -581,7 +593,7 @@ impl AsRef<[u8]> for SigningPrivateKey {
 
 /// Signing public key.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SigningPublicKey {
+pub enum VerifyingKey {
     /// EdDSA.
     Ed25519(ed25519_dalek::VerifyingKey),
 
@@ -600,12 +612,12 @@ pub enum SigningPublicKey {
     DsaSha1(DsaPublicKey),
 }
 
-impl SigningPublicKey {
+impl VerifyingKey {
     /// Create signing public key from bytes.
     //
     // TODO: verify it's valid point on the curve
     pub fn from_bytes(key: &[u8; 32]) -> Option<Self> {
-        Some(SigningPublicKey::Ed25519(
+        Some(VerifyingKey::Ed25519(
             ed25519_dalek::VerifyingKey::from_bytes(key).ok()?,
         ))
     }
@@ -661,7 +673,7 @@ impl SigningPublicKey {
     }
 }
 
-impl AsRef<[u8]> for SigningPublicKey {
+impl AsRef<[u8]> for VerifyingKey {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Ed25519(key) => key.as_bytes(),

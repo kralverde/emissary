@@ -17,7 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{chachapoly::ChaChaPoly, SigningPublicKey},
+    crypto::{chachapoly::ChaChaPoly, VerifyingKey},
     error::Ssu2Error,
     events::EventHandle,
     i2np::Message,
@@ -176,7 +176,7 @@ pub struct Ssu2SessionContext {
     pub send_key_ctx: KeyContext,
 
     /// Verifying key of remote router.
-    pub verifying_key: SigningPublicKey,
+    pub verifying_key: VerifyingKey,
 }
 
 /// Active SSU2 session.
@@ -265,7 +265,7 @@ pub struct Ssu2Session<R: Runtime> {
     transport_tx: Sender<SubsystemEvent>,
 
     /// Verifying key of remote router.
-    verifying_key: SigningPublicKey,
+    verifying_key: VerifyingKey,
 
     /// Write buffer
     write_buffer: VecDeque<(BytesMut, Option<SocketAddr>)>,
@@ -667,10 +667,11 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                     self.transmission.schedule(message);
                     let _ = feedback_tx.send(());
                 }
-                Poll::Ready(Some(OutboundMessage::Messages(messages))) =>
+                Poll::Ready(Some(OutboundMessage::Messages(messages))) => {
                     for message in messages {
                         self.transmission.schedule(message);
-                    },
+                    }
+                }
                 Poll::Ready(Some(OutboundMessage::Dummy)) => {}
             }
         }
@@ -786,8 +787,9 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                                 // the next time
                                 self.write_buffer.push_back((pkt, destination));
                             }
-                            Poll::Ready(None) =>
-                                return Poll::Ready(TerminationReason::RouterShutdown),
+                            Poll::Ready(None) => {
+                                return Poll::Ready(TerminationReason::RouterShutdown)
+                            }
                             Poll::Ready(Some(nwritten)) => {
                                 self.router_ctx
                                     .metrics_handle()
@@ -842,7 +844,7 @@ impl<R: Runtime> Future for Ssu2Session<R> {
 mod tests {
     use super::*;
     use crate::{
-        crypto::SigningPrivateKey,
+        crypto::SigningKey,
         events::EventManager,
         i2np::{MessageType, I2NP_MESSAGE_EXPIRATION},
         primitives::{MessageId, RouterInfoBuilder},
@@ -865,7 +867,7 @@ mod tests {
             <MockRuntime as Runtime>::UdpSocket::bind("127.0.0.1:0".parse().unwrap())
                 .await
                 .unwrap();
-        let remote_signing_key = SigningPrivateKey::random(rand::rng());
+        let remote_signing_key = SigningKey::random(rand::rng());
         let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
         let (_event_mgr, _event_subscriber, event_handle) =
             EventManager::new(None, MockRuntime::register_metrics(vec![], None));

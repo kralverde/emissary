@@ -469,10 +469,12 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.x25519.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD,
+                            SocketAddr::V4(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (
@@ -488,10 +490,12 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.ml_kem_512.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD,
+                            SocketAddr::V4(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (
@@ -507,12 +511,14 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.ml_kem_768.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
+                            SocketAddr::V4(_) => {
                                 constants::crypto::ml_kem::ML_KEM_768_IPV4_MIN_MTU
-                                    - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
+                                    - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
                                 constants::crypto::ml_kem::ML_KEM_768_IPV6_MIN_MTU
-                                    - constants::ssu2::IPV6_OVERHEAD,
+                                    - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (version, preference) => {
@@ -625,16 +631,18 @@ impl<R: Runtime> Ssu2Socket<R> {
 
                         match (ipv4_status, ipv6_status) {
                             (None, None) => return Ok(None),
-                            (Some(status), None) =>
+                            (Some(status), None) => {
                                 return Ok(Some(TransportEvent::FirewallStatus {
                                     status,
                                     ipv4: true,
-                                })),
-                            (None, Some(status)) =>
+                                }))
+                            }
+                            (None, Some(status)) => {
                                 return Ok(Some(TransportEvent::FirewallStatus {
                                     status,
                                     ipv4: false,
-                                })),
+                                }))
+                            }
                             (Some(ipv4_status), Some(ipv6_status)) => {
                                 self.pending_events.push_back(TransportEvent::FirewallStatus {
                                     status: ipv6_status,
@@ -691,10 +699,12 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.x25519.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD,
+                            SocketAddr::V4(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (
@@ -710,10 +720,12 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.ml_kem_512.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
-                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD,
+                            SocketAddr::V4(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
+                                constants::ssu2::MIN_MTU - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (
@@ -729,12 +741,14 @@ impl<R: Runtime> Ssu2Socket<R> {
                             self.ml_kem_768.inbound_state,
                         )),
                         match address {
-                            SocketAddr::V4(_) =>
+                            SocketAddr::V4(_) => {
                                 constants::crypto::ml_kem::ML_KEM_768_IPV4_MIN_MTU
-                                    - constants::ssu2::IPV4_OVERHEAD,
-                            SocketAddr::V6(_) =>
+                                    - constants::ssu2::IPV4_OVERHEAD
+                            }
+                            SocketAddr::V6(_) => {
                                 constants::crypto::ml_kem::ML_KEM_768_IPV6_MIN_MTU
-                                    - constants::ssu2::IPV6_OVERHEAD,
+                                    - constants::ssu2::IPV6_OVERHEAD
+                            }
                         },
                     ),
                     (version, preference) => {
@@ -950,7 +964,7 @@ impl<R: Runtime> Ssu2Socket<R> {
         // must succeed since `TransportManager` has ensured `router_info` contains
         // a valid and reachable ssu2 router address
         let router_id = router_info.identity.id();
-        let verifying_key = router_info.identity.signing_key().clone();
+        let verifying_key = router_info.identity.verifying_key().clone();
 
         // attempt to locate a router address with reachable socket address
         //
@@ -1026,22 +1040,24 @@ impl<R: Runtime> Ssu2Socket<R> {
                     .finalize_new(),
             )),
             Some(ml_kem) => match ml_kem {
-                MlKemPreference::MlKem512 | MlKemPreference::MlKem512MlKem768 =>
+                MlKemPreference::MlKem512 | MlKemPreference::MlKem512MlKem768 => {
                     EncryptionContext::MlKem512X25519(NoiseContext::new(
                         self.ml_kem_512.chaining_key,
                         Sha256::new()
                             .update(self.ml_kem_512.outbound_state)
                             .update(static_key)
                             .finalize_new(),
-                    )),
-                MlKemPreference::MlKem768 | MlKemPreference::MlKem768MlKem512 =>
+                    ))
+                }
+                MlKemPreference::MlKem768 | MlKemPreference::MlKem768MlKem512 => {
                     EncryptionContext::MlKem768X25519(NoiseContext::new(
                         self.ml_kem_768.chaining_key,
                         Sha256::new()
                             .update(self.ml_kem_768.outbound_state)
                             .update(static_key)
                             .finalize_new(),
-                    )),
+                    ))
+                }
             },
         };
 
@@ -1169,14 +1185,15 @@ impl<R: Runtime> Ssu2Socket<R> {
             let reader = self.router_ctx.profile_storage().reader();
 
             match reader.router_info(&context.router_id) {
-                Some(router_info) =>
+                Some(router_info) => {
                     if router_info.supports_relay() {
                         self.relay_manager.add_session(
                             &context.router_id,
                             relay_handle.cmd_tx(),
                             context.address.is_ipv4(),
                         );
-                    },
+                    }
+                }
                 None => tracing::warn!(
                     target: LOG_TARGET,
                     router_id = %context.router_id,
@@ -1802,16 +1819,18 @@ impl<R: Runtime> Stream for Ssu2Socket<R> {
 
                 match (ipv4_status, ipv6_status) {
                     (None, None) => {}
-                    (Some(status), None) =>
+                    (Some(status), None) => {
                         return Poll::Ready(Some(TransportEvent::FirewallStatus {
                             status,
                             ipv4: true,
-                        })),
-                    (None, Some(status)) =>
+                        }))
+                    }
+                    (None, Some(status)) => {
                         return Poll::Ready(Some(TransportEvent::FirewallStatus {
                             status,
                             ipv4: false,
-                        })),
+                        }))
+                    }
                     (Some(ipv4_status), Some(ipv6_status)) => {
                         this.pending_events.push_back(TransportEvent::FirewallStatus {
                             status: ipv6_status,
@@ -1834,13 +1853,15 @@ impl<R: Runtime> Stream for Ssu2Socket<R> {
                 Poll::Ready(Some(RelayManagerEvent::SessionRequestToken { token })) => {
                     this.tokens.insert(token);
                 }
-                Poll::Ready(Some(RelayManagerEvent::IntroducerExpired { router_id, ipv4 })) =>
-                    return Poll::Ready(Some(TransportEvent::IntroducerRemoved { router_id, ipv4 })),
-                Poll::Ready(Some(RelayManagerEvent::RelayFailure { router_id })) =>
+                Poll::Ready(Some(RelayManagerEvent::IntroducerExpired { router_id, ipv4 })) => {
+                    return Poll::Ready(Some(TransportEvent::IntroducerRemoved { router_id, ipv4 }))
+                }
+                Poll::Ready(Some(RelayManagerEvent::RelayFailure { router_id })) => {
                     return Poll::Ready(Some(TransportEvent::ConnectionFailure {
                         router_id,
                         reason: DialError::RelayFailure,
-                    })),
+                    }))
+                }
                 Poll::Ready(Some(RelayManagerEvent::RelaySuccess {
                     address,
                     router_id,

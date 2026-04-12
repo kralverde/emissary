@@ -18,7 +18,7 @@
 
 use crate::{
     config::Config,
-    crypto::{SigningPrivateKey, StaticPrivateKey},
+    crypto::{SigningKey, StaticPrivateKey},
     error::parser::RouterInfoParseError,
     primitives::{
         router_address::TransportKind, Capabilities, Date, Mapping, RouterAddress, RouterIdentity,
@@ -69,7 +69,7 @@ impl RouterInfo {
         ssu2_ipv4: Option<RouterAddress>,
         ssu2_ipv6: Option<RouterAddress>,
         static_key: &StaticPrivateKey,
-        signing_key: &SigningPrivateKey,
+        signing_key: &SigningKey,
         transit_tunnels_disabled: bool,
     ) -> Self {
         let Config {
@@ -213,7 +213,7 @@ impl RouterInfo {
         };
 
         identity
-            .signing_key()
+            .verifying_key()
             .verify(&input[..input.len() - SIGNATURE_LEN], rest)
             .map_err(|_| Err::Error(RouterInfoParseError::InvalidSignature))?;
 
@@ -231,7 +231,7 @@ impl RouterInfo {
     }
 
     /// Serialize [`RouterInfo`] into a byte vector.
-    pub fn serialize(&self, signing_key: &SigningPrivateKey) -> Vec<u8> {
+    pub fn serialize(&self, signing_key: &SigningKey) -> Vec<u8> {
         let identity = self.identity.serialize();
         let published = self.published.serialize();
         let addresses =
@@ -334,8 +334,9 @@ impl RouterInfo {
     /// Try to locate NTCP2 over IPv4.
     pub fn ntcp2_ipv4(&self) -> Option<&RouterAddress> {
         self.addresses.iter().find(|address| match address {
-            RouterAddress::Ntcp2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv4()),
+            RouterAddress::Ntcp2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv4())
+            }
             _ => false,
         })
     }
@@ -343,8 +344,9 @@ impl RouterInfo {
     /// Try to locate NTCP2 over IPv4 and return mutable reference to it.
     pub fn ntcp2_ipv4_mut(&mut self) -> Option<&mut RouterAddress> {
         self.addresses.iter_mut().find(|address| match address {
-            RouterAddress::Ntcp2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv4()),
+            RouterAddress::Ntcp2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv4())
+            }
             _ => false,
         })
     }
@@ -352,8 +354,9 @@ impl RouterInfo {
     /// Try to locate NTCP2 over IPv6 and return mutable reference to it.
     pub fn ntcp2_ipv6_mut(&mut self) -> Option<&mut RouterAddress> {
         self.addresses.iter_mut().find(|address| match address {
-            RouterAddress::Ntcp2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv6()),
+            RouterAddress::Ntcp2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv6())
+            }
             _ => false,
         })
     }
@@ -361,8 +364,9 @@ impl RouterInfo {
     /// Try to locate SSU2 over IPv4.
     pub fn ssu2_ipv4(&self) -> Option<&RouterAddress> {
         self.addresses.iter().find(|address| match address {
-            RouterAddress::Ssu2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv4()),
+            RouterAddress::Ssu2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv4())
+            }
             _ => false,
         })
     }
@@ -370,8 +374,9 @@ impl RouterInfo {
     /// Try to locate SSU2 over IPv6.
     pub fn ssu2_ipv6(&self) -> Option<&RouterAddress> {
         self.addresses.iter().find(|address| match address {
-            RouterAddress::Ssu2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv6()),
+            RouterAddress::Ssu2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv6())
+            }
             _ => false,
         })
     }
@@ -379,8 +384,9 @@ impl RouterInfo {
     /// Try to locate SSU2 over IPv4 and return mutable reference to it.
     pub fn ssu2_ipv4_mut(&mut self) -> Option<&mut RouterAddress> {
         self.addresses.iter_mut().find(|address| match address {
-            RouterAddress::Ssu2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv4()),
+            RouterAddress::Ssu2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv4())
+            }
             _ => false,
         })
     }
@@ -388,8 +394,9 @@ impl RouterInfo {
     /// Try to locate SSU2 over IPv6 and return mutable reference to it.
     pub fn ssu2_ipv6_mut(&mut self) -> Option<&mut RouterAddress> {
         self.addresses.iter_mut().find(|address| match address {
-            RouterAddress::Ssu2 { socket_address, .. } =>
-                socket_address.is_some_and(|address| address.is_ipv6()),
+            RouterAddress::Ssu2 { socket_address, .. } => {
+                socket_address.is_some_and(|address| address.is_ipv6())
+            }
             _ => false,
         })
     }
@@ -408,10 +415,11 @@ impl RouterInfo {
         self.addresses.iter().fold(None, |selected, transport| {
             match transport.classify() {
                 None => return selected,
-                Some(kind) =>
+                Some(kind) => {
                     if !supported.contains(&kind) {
                         return selected;
-                    },
+                    }
+                }
             }
 
             match selected {
@@ -495,14 +503,14 @@ pub(crate) mod builder {
         }
 
         /// Build [`RouterInfoBuilder`] into a [`RouterInfo].
-        pub fn build(&mut self) -> (RouterInfo, StaticPrivateKey, SigningPrivateKey) {
+        pub fn build(&mut self) -> (RouterInfo, StaticPrivateKey, SigningKey) {
             let static_key = match self.static_key.take() {
                 Some(key) => StaticPrivateKey::try_from_bytes(&key).unwrap(),
                 None => StaticPrivateKey::random(MockRuntime::rng()),
             };
             let signing_key = match self.signing_key.take() {
-                Some(key) => SigningPrivateKey::from_bytes(&key).unwrap(),
-                None => SigningPrivateKey::random(MockRuntime::rng()),
+                Some(key) => SigningKey::from_bytes(&key).unwrap(),
+                None => SigningKey::random(MockRuntime::rng()),
             };
             let identity = RouterIdentity::from_keys::<MockRuntime>(&static_key, &signing_key)
                 .expect("to succeed");

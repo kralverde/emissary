@@ -17,7 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::SigningPrivateKey,
+    crypto::SigningKey,
     destination::{routing_path::RoutingPathHandle, DeliveryStyle},
     error::StreamingError,
     primitives::{Destination, DestinationId},
@@ -272,7 +272,7 @@ pub struct StreamContext {
     pub remote: DestinationId,
 
     /// Signing key.
-    pub signing_key: SigningPrivateKey,
+    pub signing_key: SigningKey,
 }
 
 /// Pending outbound packet.
@@ -546,7 +546,7 @@ pub struct Stream<R: Runtime> {
     send_stream_id: u32,
 
     /// Signing key.
-    signing_key: SigningPrivateKey,
+    signing_key: SigningKey,
 
     /// Source port.
     src_port: u16,
@@ -1203,11 +1203,12 @@ impl<R: Runtime> Future for Stream<R> {
                             this.write_state = WriteState::GetMessage;
                             break;
                         }
-                        Some(message) =>
+                        Some(message) => {
                             this.write_state = WriteState::WriteMessage {
                                 offset: 0usize,
                                 message,
-                            },
+                            }
+                        }
                     },
                     Poll::Ready(None) => return Poll::Ready(this.recv_stream_id),
                     Poll::Ready(Some(StreamEvent::ShutDown)) => {
@@ -1217,8 +1218,9 @@ impl<R: Runtime> Future for Stream<R> {
                     }
                     Poll::Ready(Some(StreamEvent::Packet { packet })) => {
                         match this.on_packet(packet) {
-                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) =>
-                                return Poll::Ready(this.recv_stream_id),
+                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) => {
+                                return Poll::Ready(this.recv_stream_id)
+                            }
                             Err(error) => {
                                 tracing::debug!(
                                     target: LOG_TARGET,
@@ -1232,11 +1234,12 @@ impl<R: Runtime> Future for Stream<R> {
                                 this.write_state = WriteState::GetMessage;
                             }
                             Ok(()) => match this.inbound_context.pop_message() {
-                                Some(message) =>
+                                Some(message) => {
                                     this.write_state = WriteState::WriteMessage {
                                         offset: 0usize,
                                         message,
-                                    },
+                                    }
+                                }
                                 None => this.write_state = WriteState::GetMessage,
                             },
                         }
@@ -1280,8 +1283,9 @@ impl<R: Runtime> Future for Stream<R> {
                     }
                     Poll::Ready(Some(StreamEvent::Packet { packet })) => {
                         match this.on_packet(packet) {
-                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) =>
-                                return Poll::Ready(this.recv_stream_id),
+                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) => {
+                                return Poll::Ready(this.recv_stream_id)
+                            }
                             Err(error) => {
                                 tracing::debug!(
                                     target: LOG_TARGET,
@@ -1377,7 +1381,7 @@ impl<R: Runtime> Future for Stream<R> {
                             this.rto_timer = Some(R::timer(*this.rto));
                         }
                     }
-                    true if !core::matches!(this.read_state, SocketState::Closed) =>
+                    true if !core::matches!(this.read_state, SocketState::Closed) => {
                         match Pin::new(&mut this.stream)
                             .as_mut()
                             .poll_read(cx, &mut this.read_buffer)
@@ -1395,7 +1399,8 @@ impl<R: Runtime> Future for Stream<R> {
                             Poll::Ready(Ok(nread)) => {
                                 this.read_state = SocketState::SendMessage { offset: nread };
                             }
-                        },
+                        }
+                    }
                     true => break,
                 },
                 SocketState::SendMessage { offset } => {
@@ -1518,7 +1523,7 @@ mod tests {
     impl StreamBuilder {
         async fn build_stream() -> (Stream<MockRuntime>, Self) {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+            let signing_key = SigningKey::random(MockRuntime::rng());
             let destination = Destination::new::<MockRuntime>(signing_key.public());
             let destination_id = destination.id();
 
@@ -1573,12 +1578,12 @@ mod tests {
             let address = listener.local_addr().unwrap();
 
             // destination for the stream receiver
-            let inbound_signing_key = SigningPrivateKey::random(MockRuntime::rng());
+            let inbound_signing_key = SigningKey::random(MockRuntime::rng());
             let inbound_destination = Destination::new::<MockRuntime>(inbound_signing_key.public());
             let inbound_destination_id = inbound_destination.id();
 
             // destination for the stream initiator
-            let outbound_signing_key = SigningPrivateKey::random(MockRuntime::rng());
+            let outbound_signing_key = SigningKey::random(MockRuntime::rng());
             let outbound_destination =
                 Destination::new::<MockRuntime>(outbound_signing_key.public());
             let outbound_destination_id = outbound_destination.id();

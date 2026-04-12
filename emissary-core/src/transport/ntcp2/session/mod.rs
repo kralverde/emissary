@@ -351,10 +351,12 @@ impl<R: Runtime> SessionManager<R> {
             inbound: InboundState {
                 ml_kem: match static_key {
                     StaticPrivateKey::X25519(_) => None,
-                    StaticPrivateKey::MlKem512X25519(_) =>
-                        Some(MlKemContext::MlKem512X25519((ml_kem_512.0, ml_kem_512.2))),
-                    StaticPrivateKey::MlKem768X25519(_) =>
-                        Some(MlKemContext::MlKem768X25519((ml_kem_768.0, ml_kem_768.2))),
+                    StaticPrivateKey::MlKem512X25519(_) => {
+                        Some(MlKemContext::MlKem512X25519((ml_kem_512.0, ml_kem_512.2)))
+                    }
+                    StaticPrivateKey::MlKem768X25519(_) => {
+                        Some(MlKemContext::MlKem768X25519((ml_kem_768.0, ml_kem_768.2)))
+                    }
                     StaticPrivateKey::MlKem1024X25519(_) => Some(MlKemContext::MlKem1024X25519((
                         ml_kem_1024.0,
                         ml_kem_1024.2,
@@ -765,7 +767,7 @@ impl<R: Runtime> SessionManager<R> {
 mod tests {
     use super::*;
     use crate::{
-        crypto::{SigningPrivateKey, StaticPrivateKey},
+        crypto::{SigningKey, StaticPrivateKey},
         events::EventManager,
         i2np::{Message, MessageType, I2NP_MESSAGE_EXPIRATION},
         primitives::{Capabilities, Date, Mapping, RouterAddress, RouterIdentity, RouterInfo, Str},
@@ -865,7 +867,7 @@ mod tests {
         }
 
         fn build(mut self) -> Ntcp2 {
-            let signing_key = SigningPrivateKey::random(R::rng());
+            let signing_key = SigningKey::random(R::rng());
             let static_key = StaticPrivateKey::random(R::rng());
             let identity =
                 RouterIdentity::from_keys::<MockRuntime>(&static_key, &signing_key).unwrap();
@@ -910,7 +912,7 @@ mod tests {
         ntcp2_iv: [u8; 16],
         ntcp2_key: [u8; 32],
         router_info: RouterInfo,
-        signing_key: SigningPrivateKey,
+        signing_key: SigningKey,
         static_key: StaticPrivateKey,
     }
 
@@ -1384,8 +1386,9 @@ mod tests {
         let (_local_router, remote_command_tx) =
             tokio::time::timeout(Duration::from_secs(5), async {
                 match remote_rx.recv().await {
-                    Some(SubsystemEvent::ConnectionEstablished { router_id, tx }) =>
-                        (router_id, tx),
+                    Some(SubsystemEvent::ConnectionEstablished { router_id, tx }) => {
+                        (router_id, tx)
+                    }
                     _ => panic!("invalid event received"),
                 }
             })
@@ -1394,8 +1397,9 @@ mod tests {
         let (_remote_router, _local_command_tx) =
             tokio::time::timeout(Duration::from_secs(5), async {
                 match local_rx.recv().await {
-                    Some(SubsystemEvent::ConnectionEstablished { router_id, tx }) =>
-                        (router_id, tx),
+                    Some(SubsystemEvent::ConnectionEstablished { router_id, tx }) => {
+                        (router_id, tx)
+                    }
                     _ => panic!("invalid event received"),
                 }
             })

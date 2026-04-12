@@ -409,7 +409,7 @@ impl<R: Runtime> Stream for Ssu2Transport<R> {
 mod tests {
     use super::*;
     use crate::{
-        crypto::{base64_encode, SigningPrivateKey},
+        crypto::{base64_encode, SigningKey},
         events::EventManager,
         i2np::{Message, MessageType, I2NP_MESSAGE_EXPIRATION},
         primitives::Str,
@@ -493,11 +493,11 @@ mod tests {
 
         let (static1, signing1) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static2, signing2) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let router_info1 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -592,10 +592,12 @@ mod tests {
             Err(_) => panic!("timeout"),
             Ok(encryption) => match encryption {
                 EncryptionKind::X25519 => assert!(disable_pq && ml_kem.is_none()),
-                EncryptionKind::MlKem512X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string()),
-                EncryptionKind::MlKem768X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string()),
+                EncryptionKind::MlKem512X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string())
+                }
+                EncryptionKind::MlKem768X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string())
+                }
                 EncryptionKind::MlKem1024X25519 => unreachable!(),
             },
         }
@@ -671,11 +673,11 @@ mod tests {
 
         let (static1, signing1) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static2, signing2) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let router_info1 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -835,15 +837,15 @@ mod tests {
 
         let (static1, signing1) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static2, signing2) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static3, signing3) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let router_info1 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -992,10 +994,12 @@ mod tests {
             Err(_) => panic!("timeout"),
             Ok(encryption) => match encryption {
                 EncryptionKind::X25519 => assert!(disable_pq && ml_kem.is_none()),
-                EncryptionKind::MlKem512X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string()),
-                EncryptionKind::MlKem768X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string()),
+                EncryptionKind::MlKem512X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string())
+                }
+                EncryptionKind::MlKem768X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string())
+                }
                 EncryptionKind::MlKem1024X25519 => unreachable!(),
             },
         }
@@ -1136,11 +1140,11 @@ mod tests {
 
         let (static1, signing1) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static2, signing2) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let mut router_info1 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -1327,7 +1331,7 @@ mod tests {
 
         let (static3, signing3) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let router_info3 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -1413,10 +1417,12 @@ mod tests {
 
                     match encryption {
                         EncryptionKind::X25519 => assert!(disable_pq && ml_kem.is_none()),
-                        EncryptionKind::MlKem512X25519 =>
-                            assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string()),
-                        EncryptionKind::MlKem768X25519 =>
-                            assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string()),
+                        EncryptionKind::MlKem512X25519 => {
+                            assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string())
+                        }
+                        EncryptionKind::MlKem768X25519 => {
+                            assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string())
+                        }
                         EncryptionKind::MlKem1024X25519 => unreachable!(),
                     }
 
@@ -1521,11 +1527,11 @@ mod tests {
 
         let (static1, signing1) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let (static2, signing2) = (
             StaticPrivateKey::random(MockRuntime::rng()),
-            SigningPrivateKey::random(MockRuntime::rng()),
+            SigningKey::random(MockRuntime::rng()),
         );
         let mut router_info1 = RouterInfo::new::<MockRuntime>(
             &Default::default(),
@@ -1629,10 +1635,12 @@ mod tests {
             Err(_) => panic!("timeout"),
             Ok(encryption) => match encryption {
                 EncryptionKind::X25519 => assert!(disable_pq && ml_kem.is_none()),
-                EncryptionKind::MlKem512X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string()),
-                EncryptionKind::MlKem768X25519 =>
-                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string()),
+                EncryptionKind::MlKem512X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "3,4".to_string())
+                }
+                EncryptionKind::MlKem768X25519 => {
+                    assert!(!disable_pq && ml_kem.unwrap() == "4,3".to_string())
+                }
                 EncryptionKind::MlKem1024X25519 => unreachable!(),
             },
         }

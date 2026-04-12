@@ -1,13 +1,20 @@
 [package]
 name = "rust-chat"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+readme.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-emissary-core = { path = "../../emissary-core", version = "0.3.0" }
-emissary-util = { path = "../../emissary-util", version = "0.3.0", default-features = false, features = ["tokio"] }
+emissary-core = { path = "../../emissary-core", version = "0.4.0" }
+emissary-util = { path = "../../emissary-util", version = "0.4.0", default-features = false, features = ["tokio"] }
 rand = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

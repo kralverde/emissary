@@ -3246,8 +3246,9 @@ mod tests {
         // verify that the dial request is ignored
         match rx.try_recv() {
             Err(_) => {}
-            Ok(Command::Connect(router_id)) if router_id == remote_router_id =>
-                panic!("connected router dialed"),
+            Ok(Command::Connect(router_id)) if router_id == remote_router_id => {
+                panic!("connected router dialed")
+            }
             _ => panic!("unexpected event"),
         }
     }
@@ -3735,8 +3736,9 @@ mod tests {
         dial_tx.send(router_id.clone()).await.unwrap();
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
@@ -3803,8 +3805,9 @@ mod tests {
         dial_tx.send(router_id.clone()).await.unwrap();
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
@@ -3860,8 +3863,9 @@ mod tests {
         dial_tx.send(router_id.clone()).await.unwrap();
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
@@ -3981,8 +3985,9 @@ mod tests {
         dial_tx.send(router_id.clone()).await.unwrap();
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
@@ -4224,8 +4229,9 @@ mod tests {
         // dial failure for the introducer is reported by the transport (omitted for
         // `MockTransport`) so the channel only contains an event for the client
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
         assert!(subsys_rx.try_recv().is_err());
@@ -4521,8 +4527,9 @@ mod tests {
 
         // verify that subsystem manager is notified of the dial failure
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
         assert!(subsys_rx.try_recv().is_err());
@@ -4839,16 +4846,18 @@ mod tests {
 
         // verify that subsystem manager is notified of the client dial failure
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
         // since the dial failure originated from transport and not from transport, subsystem
         // manager is notified of the introducer dial failure directly
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, introducer_router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, introducer_router_id)
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -5028,8 +5037,9 @@ mod tests {
 
         // verify that subsystem manager is notified of the client dial failure
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -5399,8 +5409,9 @@ mod tests {
 
         // verify dial failure is reported for the client router
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -5967,8 +5978,9 @@ mod tests {
 
             // verify dial failure is reported to the subsystem manager
             match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-                SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                    assert_eq!(remote, introducer),
+                SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                    assert_eq!(remote, introducer)
+                }
                 _ => panic!("invalid event"),
             }
             introducers.remove(&introducer);
@@ -6009,14 +6021,16 @@ mod tests {
         assert!(!manager.pending_queries.contains(&router_id));
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert!(introducers.remove(&remote).is_some()),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert!(introducers.remove(&remote).is_some())
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -6221,8 +6235,9 @@ mod tests {
         assert!(manager.pending_connections.is_empty());
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -7013,8 +7028,9 @@ mod tests {
         .await;
 
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
     }
@@ -7491,8 +7507,9 @@ mod tests {
 
         // verify that subsystem manager is notified of the dial failure
         match timeout!(subsys_rx.recv()).await.unwrap().unwrap() {
-            SubsystemEvent::ConnectionFailure { router_id: remote } =>
-                assert_eq!(remote, router_id),
+            SubsystemEvent::ConnectionFailure { router_id: remote } => {
+                assert_eq!(remote, router_id)
+            }
             _ => panic!("invalid event"),
         }
         assert!(subsys_rx.try_recv().is_err());

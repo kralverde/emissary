@@ -194,9 +194,8 @@ impl Destination {
 
                     let (verifying_key, signing_key_len) =
                         match SigningKeyKind::try_from(signing_key_kind) {
-                            Ok(SigningKeyKind::DsaSha1(_)) => {
-                                return Err(Err::Error(DestinationParseError::NotANullCertificate))
-                            }
+                            Ok(SigningKeyKind::DsaSha1(_)) =>
+                                return Err(Err::Error(DestinationParseError::NotANullCertificate)),
                             Ok(SigningKeyKind::EcDsaSha256P256(size)) => (
                                 VerifyingKey::p256(&initial_bytes[384 - 64..384])
                                     .ok_or(Err::Error(DestinationParseError::InvalidBitstream))?,
@@ -217,22 +216,20 @@ impl Destination {
                                     size,
                                 )
                             }
-                            Err(()) => {
+                            Err(()) =>
                                 return Err(Err::Error(
                                     DestinationParseError::UnsupportedSigningKey(signing_key_kind),
-                                ))
-                            }
+                                )),
                         };
 
                     let public_key_len = match PrivateKeyKind::try_from(private_key_kind) {
                         Ok(PrivateKeyKind::ElGamal(size)) => size,
                         Ok(PrivateKeyKind::P256(size)) => size,
                         Ok(PrivateKeyKind::X25519(size)) => size,
-                        Err(()) => {
+                        Err(()) =>
                             return Err(Err::Error(DestinationParseError::UnsupportedPrivateKey(
                                 private_key_kind,
-                            )))
-                        }
+                            ))),
                     };
 
                     (
@@ -243,11 +240,10 @@ impl Destination {
                         DESTINATION_WITH_KEY_CERT_LEN,
                     )
                 }
-                (certificate_kind, _certificate_len) => {
+                (certificate_kind, _certificate_len) =>
                     return Err(Err::Error(DestinationParseError::UnsupportedCertificate(
                         certificate_kind,
-                    )))
-                }
+                    ))),
             };
 
         let identity_hash = Bytes::from(Sha256::new().update(&input[..destination_len]).finalize());
